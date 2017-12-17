@@ -7,7 +7,7 @@ import { observer } from 'mobx-react'
 const Todo = types.model({
   id: types.number,
   name: types.string,
-  owner: types.optional(types.string, 'Me'),
+  owner: types.maybe(types.reference(types.late(() => User))),
   done: types.optional(types.boolean, false)
 })
   .actions(self => {
@@ -19,7 +19,12 @@ const Todo = types.model({
       self.done = !self.done
     }
 
-    return {changeName, toggleDone}
+    function setUser (userId) {
+      self.owner = userId
+      console.log('todo get user:', self)
+    }
+
+    return {changeName, toggleDone, setUser}
   })
 
 const User = types.model({
@@ -86,6 +91,20 @@ const store = RootStore.create({
 
 console.log('initialState:', store.toJSON())
 
+const UserPickerView = observer(props =>
+  <select
+    value={props.user ? props.user.id : ""}
+    onChange={e => props.onChange(e.target.value)}
+  >
+    <option value="">-none-</option>
+    {props.store.users.map(user =>
+      <option value={user.id} key={user.id}>
+        {user.name}
+      </option>
+    )}
+  </select>
+)
+
 const App = observer((props) =>
   <div>
     <ul>
@@ -97,6 +116,11 @@ const App = observer((props) =>
           return <li key={todo.id}>
             <input type="checkbox" id={todo.id} defaultChecked={todo.done} onChange={() => todo.toggleDone(todo.id)}/>
             <input type="text" defaultValue={todo.name} onChange={(event) => todo.changeName(event)}/>
+            <UserPickerView
+              user={todo.user}
+              store={store}
+              onChange={userId => todo.setUser(userId)}
+            />
           </li>
         })
       }
