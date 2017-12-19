@@ -1,7 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 import './index.css'
-import App from './ReactiveApp'
+// import App from './ReactiveApp'
+import App from './PlayerApp'
 import registerServiceWorker from './registerServiceWorker'
 
 ReactDOM.render(

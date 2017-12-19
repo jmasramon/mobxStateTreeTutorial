@@ -1,13 +1,14 @@
 import React from 'react'
 import './App.css'
 
-import {types} from 'mobx-state-tree'
+import { types, applySnapshot, onSnapshot } from 'mobx-state-tree'
+// import {asReduxStore, connectReduxDevtools} from 'mst-middlewares'
 import { observer } from 'mobx-react'
 
 const Todo = types.model({
   id: types.number,
   name: types.string,
-  owner: types.maybe(types.reference(types.late(() => User))),
+  user: types.maybe(types.reference(types.late(() => User))),
   done: types.optional(types.boolean, false)
 })
   .actions(self => {
@@ -20,7 +21,7 @@ const Todo = types.model({
     }
 
     function setUser (userId) {
-      self.owner = userId
+      self.user = userId
       console.log('todo get user:', self)
     }
 
@@ -89,11 +90,36 @@ const store = RootStore.create({
   ]
 })
 
+// const store = asReduxStore(rootStore)
+// connectReduxDevtools(require('remotedev'), rootStore)
+
 console.log('initialState:', store.toJSON())
+var states = []
+var currentFrame = -1
+
+onSnapshot(store, snapshot => {
+  console.log(snapshot)
+  if (currentFrame === states.length - 1) {
+    currentFrame++
+    states.push(snapshot)
+  }
+})
+
+export function previousState () {
+  if (currentFrame === 0) return
+  currentFrame--
+  applySnapshot(store, states[currentFrame])
+}
+
+export function nextState () {
+  if (currentFrame === states.length - 1) return
+  currentFrame++
+  applySnapshot(store, states[currentFrame])
+}
 
 const UserPickerView = observer(props =>
   <select
-    value={props.user ? props.user.id : ""}
+    value={props.user ? props.user.id : ''}
     onChange={e => props.onChange(e.target.value)}
   >
     <option value="">-none-</option>
@@ -105,27 +131,41 @@ const UserPickerView = observer(props =>
   </select>
 )
 
+const TodoView = observer(props =>
+  <li key={props.todo.id}>
+    <input type="checkbox" id={props.todo.id} defaultChecked={props.todo.done} onChange={() => props.todo.toggleDone(props.todo.id)}/>
+    <input type="text" defaultValue={props.todo.name} onChange={(event) => props.todo.changeName(event)}/>
+    <UserPickerView
+      user={props.todo.user}
+      store={store}
+      onChange={userId => props.todo.setUser(userId)}
+    />
+  </li>
+)
+
+const NewTodo = observer(props =>
+  <div>
+    <span>New todo:</span>
+    <input type="text" value={props.store.newTodoName} onChange={(event) => props.store.changeNewName(event)}/>
+    <button onClick={() => props.store.addTodo()}>Add</button>
+  </div>
+)
+
+const Pending = observer(props =>
+  <span>Still {props.store.pendingTodos} todos pending from {props.store.totalTodos}</span>
+)
+
 const App = observer((props) =>
   <div>
     <ul>
-      <span>New todo:</span>
-      <input type="text" value={store.newTodoName} onChange={(event) => store.changeNewName(event)}/>
-      <button onClick={() => store.addTodo()}>Add</button>
+      <NewTodo store={store} />
       {
         store.todos.map(todo => {
-          return <li key={todo.id}>
-            <input type="checkbox" id={todo.id} defaultChecked={todo.done} onChange={() => todo.toggleDone(todo.id)}/>
-            <input type="text" defaultValue={todo.name} onChange={(event) => todo.changeName(event)}/>
-            <UserPickerView
-              user={todo.user}
-              store={store}
-              onChange={userId => todo.setUser(userId)}
-            />
-          </li>
+          return <TodoView todo={todo} />
         })
       }
     </ul>
-    <span>Still {store.pendingTodos} todos pending from {store.totalTodos}</span>
+    <Pending store={store} />
   </div>
 )
 
